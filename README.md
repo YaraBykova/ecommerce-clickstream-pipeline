@@ -4,36 +4,34 @@
 в PostgreSQL, отбор сессий и построение воронки
 «просмотр → корзина → покупка».
 
-**Стек:** Python, psycopg, PostgreSQL 15, SQL, Docker Compose.
+Стек: Python, psycopg, PostgreSQL 15, SQL, Docker Compose.
 
 ## Источник данных
 
 [eCommerce events history in electronics store — Kaggle](https://www.kaggle.com/datasets/mkechinov/ecommerce-events-history-in-electronics-store).
 
-В проекте используется архив `events.csv.zip`:
-885 129 событий с действиями `view`, `cart` и `purchase`.
+В проекте используется архив events.csv.zip:
+885 129 событий с действиями view, cart и purchase.
 
 Исходные данные не включены в репозиторий.
 Для запуска скачайте архив со страницы датасета
-и поместите его в `data/events.csv.zip`.
+и поместите его в data/events.csv.zip.
 
 ## Архитектура
 
-```text
-ZIP / CSV
-    ↓ Python: потоковое чтение и COPY
-raw.events_import
-    ↓ SQL: отбор сессий и преобразование данных
-core.users / products / sessions / events
-    ↓ SQL
-mart.session_funnel → mart.funnel_summary
-```
+    ZIP / CSV
+        ↓ Python: потоковое чтение и COPY
+    raw.events_import
+        ↓ SQL: отбор сессий и преобразование данных
+    core.users / products / sessions / events
+        ↓ SQL
+    mart.session_funnel → mart.funnel_summary
 
-- **raw** — исходные события с приведёнными типами данных,
+- raw — исходные события с приведёнными типами данных,
   именем файла и временем загрузки.
-- **core** — пользователи, товары, сессии и события,
+- core — пользователи, товары, сессии и события,
   связанные первичными и внешними ключами.
-- **mart** — представления с этапами сессионной воронки
+- mart — представления с этапами сессионной воронки
   и сводными конверсиями.
 
 Загрузчик читает CSV построчно, без загрузки всего файла в память.
@@ -62,9 +60,9 @@ mart.session_funnel → mart.funnel_summary
 | Корзина после просмотра | 38 488 |
 | Покупка после корзины | 19 065 |
 
-- Просмотр → корзина: **8,05%**.
-- Корзина → покупка: **49,53%**.
-- Просмотр → покупка: **3,99%**.
+- Просмотр → корзина: 8,05%.
+- Корзина → покупка: 49,53%.
+- Просмотр → покупка: 3,99%.
 
 Каждая сессия учитывается на этапе не более одного раза.
 Знаменатель общей конверсии — сессии с просмотром.
@@ -99,8 +97,8 @@ mart.session_funnel → mart.funnel_summary
 2. Первое добавление в корзину строго после первого просмотра.
 3. Первая покупка строго после найденного добавления в корзину.
 
-`funnel_stage` показывает последний достигнутый этап:
-`view`, `cart`, `purchase` или `no_view`.
+funnel_stage показывает последний достигнутый этап:
+view, cart, purchase или no_view.
 
 ### Ограничения
 
@@ -119,18 +117,16 @@ mart.session_funnel → mart.funnel_summary
 
 ## Структура проекта
 
-```text
-compose.yaml
-requirements.txt
-scripts/
-    load_raw.py
-sql/
-    01_schema.sql
-    02_build_core.sql
-    03_quality_checks.sql
-    04_build_marts.sql
-    05_check_marts.sql
-```
+    compose.yaml
+    requirements.txt
+    scripts/
+        load_raw.py
+    sql/
+        01_schema.sql
+        02_build_core.sql
+        03_quality_checks.sql
+        04_build_marts.sql
+        05_check_marts.sql
 
 ## Запуск
 
@@ -140,94 +136,84 @@ sql/
 
 ### 1. Настройки и данные
 
-Создайте локальный файл `.env`:
+Создайте локальный файл .env:
 
-```dotenv
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5433
-POSTGRES_DB=electronics_events
-POSTGRES_USER=electronics_user
-POSTGRES_PASSWORD=replace_with_your_local_password
-```
+    POSTGRES_HOST=localhost
+    POSTGRES_PORT=5433
+    POSTGRES_DB=electronics_events
+    POSTGRES_USER=electronics_user
+    POSTGRES_PASSWORD=replace_with_your_local_password
 
 Замените пример пароля своим значением.
 
-Поместите исходный архив в `data/events.csv.zip`.
+Поместите исходный архив в data/events.csv.zip.
 Архив должен содержать ровно один CSV с полями в таком порядке:
 
-```text
-event_time,event_type,product_id,category_id,category_code,brand,price,user_id,user_session
-```
+    event_time,event_type,product_id,category_id,category_code,brand,price,user_id,user_session
 
-Формат времени: `2020-09-24 11:57:06 UTC`.
+Формат времени: 2020-09-24 11:57:06 UTC.
 
-Файлы `.env`, исходные данные и виртуальное окружение
-исключены из Git через `.gitignore`.
+Файлы .env, исходные данные и виртуальное окружение
+исключены из Git через .gitignore.
 
 ### 2. Окружение
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-docker compose up -d
-docker compose ps
-```
+    python -m venv .venv
+    .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+    docker compose up -d
+    docker compose ps
 
-Дождитесь статуса `healthy` у PostgreSQL.
+Дождитесь статуса healthy у PostgreSQL.
 
 ### 3. Схема и загрузка
 
 Подключитесь к PostgreSQL через DBeaver:
-`localhost:5433`, база и учётные данные — из `.env`.
+localhost:5433, база и учётные данные — из .env.
 
-Выполните целиком `sql/01_schema.sql` в пустой базе.
+Выполните целиком sql/01_schema.sql в пустой базе.
 Затем запустите загрузчик из PowerShell:
 
-```powershell
-.\.venv\Scripts\python.exe scripts/load_raw.py
-```
+    .\.venv\Scripts\python.exe scripts/load_raw.py
 
 ### 4. Преобразование и витрины
 
 В той же базе выполните SQL-файлы целиком по порядку:
 
-1. `sql/02_build_core.sql`
-2. `sql/03_quality_checks.sql`
-3. `sql/04_build_marts.sql`
-4. `sql/05_check_marts.sql`
+1. sql/02_build_core.sql
+2. sql/03_quality_checks.sql
+3. sql/04_build_marts.sql
+4. sql/05_check_marts.sql
 
 Результаты доступны запросами:
 
-```sql
-SELECT * FROM mart.funnel_summary;
+    SELECT * FROM mart.funnel_summary;
 
-SELECT funnel_stage, COUNT(*) AS session_count
-FROM mart.session_funnel
-GROUP BY funnel_stage
-ORDER BY session_count DESC;
-```
+    SELECT funnel_stage, COUNT(*) AS session_count
+    FROM mart.session_funnel
+    GROUP BY funnel_stage
+    ORDER BY session_count DESC;
 
 ## Проверки
 
-`03_quality_checks.sql` показывает баланс событий между слоями,
+03_quality_checks.sql показывает баланс событий между слоями,
 причины исключения и сверяет сведения о сессиях с событиями core.
 
-`05_check_marts.sql` проверяет:
+05_check_marts.sql проверяет:
 
 - отсутствие пропущенных и лишних сессий;
 - отсутствие дублей сессий;
 - хронологический порядок этапов.
 
-На полном файле все счётчики несоответствий дали **0**.
+На полном файле все счётчики несоответствий дали 0.
 Проверки возвращают SQL-результаты для просмотра;
 автоматическое завершение процесса с ошибкой не реализовано.
 
 ## Повторный запуск
 
 - Загрузчик отменяет загрузку, если raw уже содержит данные.
-- `01_schema.sql` предназначен для первоначального создания таблиц.
-- `02_build_core.sql` полностью пересобирает core из сохранённого raw.
-- `04_build_marts.sql` пересоздаёт представления.
+- 01_schema.sql предназначен для первоначального создания таблиц.
+- 02_build_core.sql полностью пересобирает core из сохранённого raw.
+- 04_build_marts.sql пересоздаёт представления.
 - После пересборки следует повторить проверки.
 
 Инкрементальная загрузка в этой версии не реализована.
