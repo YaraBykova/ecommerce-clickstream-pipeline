@@ -6,24 +6,25 @@ WITH actual_funnel AS MATERIALIZED (
 event_views AS (
     SELECT
         session_id,
-        category_id,
+        BTRIM(category_code) AS category_code,
         event_type,
         event_time,
         MIN(event_time) FILTER (WHERE event_type = 'view') OVER (
-            PARTITION BY session_id, category_id
+            PARTITION BY session_id, BTRIM(category_code)
         ) AS view_at
     FROM core.events
+    WHERE NULLIF(BTRIM(category_code), '') IS NOT NULL
 ),
 expected_funnel AS (
     SELECT
         session_id,
-        category_id,
+        category_code,
         MIN(view_at) AS view_at,
         MIN(event_time) FILTER (
             WHERE event_type = 'cart' AND event_time > view_at
         ) AS cart_at
     FROM event_views
-    GROUP BY session_id, category_id
+    GROUP BY session_id, category_code
     HAVING MIN(view_at) IS NOT NULL
 )
 SELECT
@@ -45,9 +46,9 @@ SELECT
     (
         SELECT COUNT(*)
         FROM (
-            SELECT session_id, category_id
+            SELECT session_id, category_code
             FROM actual_funnel
-            GROUP BY session_id, category_id
+            GROUP BY session_id, category_code
             HAVING COUNT(*) > 1
         ) AS duplicates
     ) AS duplicate_pairs,
@@ -59,13 +60,16 @@ SELECT
     ) AS invalid_counts
 FROM expected_funnel AS expected
 FULL JOIN actual_funnel AS actual
-    USING (session_id, category_id);
+    USING (session_id, category_code);
 
--- Несколько непустых названий одного ID требуют проверки источника.
-SELECT COUNT(*) AS category_ids_with_multiple_codes
-FROM (
-    SELECT category_id
-    FROM core.events
-    GROUP BY category_id
-    HAVING COUNT(DISTINCT NULLIF(BTRIM(category_code), '')) > 1
-) AS ambiguous_categories;
+SELECT COUNT(*) AS invalid_category_codes
+FROM mart.category_conversion
+WHERE NULLIF(BTRIM(category_code), '') IS NULL;
+
+-- Все события core распределены между заполненными и неизвестными категориями.
+SELECT COUNT(*) AS invalid_coverage
+FROM mart.category_data_quality
+WHERE total_events <> named_category_events + unnamed_category_events
+   OR total_events <> (SELECT COUNT(*) FROM core.events)
+   OR unnamed_category_share IS DISTINCT FROM
+       unnamed_category_events::NUMERIC / NULLIF(total_events, 0);

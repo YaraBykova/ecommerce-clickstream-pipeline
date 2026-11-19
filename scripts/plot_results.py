@@ -66,7 +66,7 @@ def plot_funnel(summary):
     plt.close(fig)
 
 
-def plot_categories(categories):
+def plot_categories(categories, coverage):
     total_views = sum(row["view_sessions"] for row in categories)
     total_carts = sum(row["cart_sessions"] for row in categories)
     baseline = Decimal(total_carts) / Decimal(total_views) if total_views else Decimal(0)
@@ -75,7 +75,7 @@ def plot_categories(categories):
                   if row["view_sessions"] >= MIN_VIEW_SESSIONS
                   and row["cart_sessions"] * total_views
                   < total_carts * row["view_sessions"]]
-    candidates.sort(key=lambda row: (-row["sessions_without_cart"], row["category_id"]))
+    candidates.sort(key=lambda row: (-row["sessions_without_cart"], row["category_code"]))
     candidates = candidates[:5]
     if not candidates:
         raise ValueError("Нет категорий, соответствующих правилу отбора для графика")
@@ -83,9 +83,11 @@ def plot_categories(categories):
     names = {
         "electronics.telephone": "Телефоны",
         "electronics.video.tv": "Телевизоры",
+        "stationery.cartrige": "Картриджи",
+        "electronics.audio.acoustic": "Акустика",
+        "computers.notebook": "Ноутбуки",
     }
-    labels = [names.get(row["category_code"], row["category_code"] or "Без названия")
-              + f"\nID {row['category_id']}" for row in candidates]
+    labels = [names.get(row["category_code"], row["category_code"]) for row in candidates]
     rates = [float(row["view_to_cart_conversion"]) * 100 for row in candidates]
     counts = [row["sessions_without_cart"] for row in candidates]
     positions = list(range(len(candidates)))
@@ -94,9 +96,9 @@ def plot_categories(categories):
     fig, (rate_axis, count_axis) = plt.subplots(
         1, 2, figsize=(12, 7.2), sharey=True, gridspec_kw={"width_ratios": [1, 1.15]}
     )
-    fig.subplots_adjust(left=0.29, right=0.96, top=0.72, bottom=0.22, wspace=0.19)
+    fig.subplots_adjust(left=0.16, right=0.96, top=0.72, bottom=0.22, wspace=0.19)
     fig.text(0.035, 0.92, "Какие категории проверить в первую очередь", fontsize=22, weight="bold", color=TEXT)
-    fig.text(0.035, 0.85, "Переход к корзине той же категории · одна пара «сессия + категория» учитывается один раз",
+    fig.text(0.035, 0.85, "Одинаковые названия объединены · одна пара «сессия + название категории» учитывается один раз",
              fontsize=12, color=MUTED)
 
     rate_axis.barh(positions, rates, color=colors, height=0.54)
@@ -128,12 +130,14 @@ def plot_categories(categories):
                         format_count(counts[position]),
                         va="center", fontsize=12, weight="bold", color=TEXT)
 
-    fig.text(0.035, 0.135, "Пунктир — общая доля переходов по категориям  " + format_percent(baseline),
+    fig.text(0.035, 0.135, "Пунктир — общая доля переходов по известным категориям  " + format_percent(baseline),
              fontsize=12, color=TEXT)
     fig.text(0.035, 0.065,
              f"Отбор — от {format_count(MIN_VIEW_SESSIONS)} сессий с просмотром и конверсия ниже общей доли.\n"
              "Порядок — по числу сессий без корзины.", fontsize=11, color=MUTED)
-    fig.text(0.035, 0.025, "Разные ID с одинаковым названием остаются отдельными группами источника.",
+    fig.text(0.035, 0.025,
+             "События с неизвестной категорией — " + format_percent(coverage["unnamed_category_share"])
+             + " событий core; их доля показана отдельно в README.",
              fontsize=10, color=MUTED)
     fig.savefig(OUTPUT_DIR / "category-conversion.png", dpi=160, facecolor="white")
     plt.close(fig)
@@ -146,11 +150,13 @@ def create_charts(connection):
         summary = cursor.fetchone()
         cursor.execute("SELECT * FROM mart.category_conversion")
         categories = cursor.fetchall()
+        cursor.execute("SELECT * FROM mart.category_data_quality")
+        coverage = cursor.fetchone()
     if not summary or not summary["view_sessions"] or not categories:
         raise ValueError("Для графиков нужны заполненные витрины магазина и категорий")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     plt.rcParams.update({"font.family": "DejaVu Sans", "text.color": TEXT})
-    plot_categories(categories)
+    plot_categories(categories, coverage)
     plot_funnel(summary)
 
 
