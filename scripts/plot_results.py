@@ -34,11 +34,12 @@ def format_percent(value):
 
 def plot_funnel(summary):
     counts = [summary["view_sessions"], summary["cart_sessions"], summary["purchase_sessions"]]
-    labels = ["Просмотр", "Корзина после просмотра", "Покупка после корзины"]
+    labels = ["Просмотр", "Корзина", "Покупка"]
     fig, axis = plt.subplots(figsize=(12, 5.4))
-    fig.subplots_adjust(left=0.25, right=0.93, top=0.73, bottom=0.23)
-    fig.text(0.04, 0.91, "Где прерывается путь к покупке", fontsize=22, weight="bold", color=TEXT)
-    fig.text(0.04, 0.83, "Общая воронка магазина · каждая сессия учитывается один раз", fontsize=12, color=MUTED)
+    fig.subplots_adjust(left=0.16, right=0.93, top=0.73, bottom=0.20)
+    fig.text(0.04, 0.91, "Сколько сессий доходит до покупки", fontsize=22, weight="bold", color=TEXT)
+    fig.text(0.04, 0.83, "Шаги одной сессии учитываются по порядку — просмотр → корзина → покупка",
+             fontsize=12, color=MUTED)
 
     axis.barh(labels, counts, color=["#436A8B", ACCENT, "#715986"], height=0.52)
     axis.invert_yaxis()
@@ -56,13 +57,9 @@ def plot_funnel(summary):
                   f"{format_count(count)}  ·  {format_percent(share)}",
                   va="center", fontsize=12, weight="bold", color=TEXT)
 
-    fig.text(0.04, 0.08,
-             "Просмотр → корзина  " + format_percent(summary["view_to_cart_conversion"])
-             + "     Корзина → покупка  " + format_percent(summary["cart_to_purchase_conversion"]),
-             fontsize=12, color=TEXT)
-    fig.text(0.04, 0.025, "Проценты рядом со столбцами рассчитаны от сессий с просмотром.",
-             fontsize=10, color=MUTED)
-    fig.savefig(OUTPUT_DIR / "session-funnel.png", dpi=160, facecolor="white")
+    fig.text(0.04, 0.07, "Все проценты рассчитаны от " + format_count(counts[0]) + " сессий с просмотром.",
+             fontsize=12, color=MUTED)
+    fig.savefig(OUTPUT_DIR / "purchase-funnel.png", dpi=160, facecolor="white")
     plt.close(fig)
 
 
@@ -96,9 +93,9 @@ def plot_categories(categories, coverage):
     fig, (rate_axis, count_axis) = plt.subplots(
         1, 2, figsize=(12, 7.2), sharey=True, gridspec_kw={"width_ratios": [1, 1.15]}
     )
-    fig.subplots_adjust(left=0.16, right=0.96, top=0.72, bottom=0.22, wspace=0.19)
-    fig.text(0.035, 0.92, "Какие категории проверить в первую очередь", fontsize=22, weight="bold", color=TEXT)
-    fig.text(0.035, 0.85, "Одинаковые названия объединены · одна пара «сессия + название категории» учитывается один раз",
+    fig.subplots_adjust(left=0.16, right=0.96, top=0.72, bottom=0.27, wspace=0.19)
+    fig.text(0.035, 0.92, "Добавление в корзину по категориям", fontsize=22, weight="bold", color=TEXT)
+    fig.text(0.035, 0.85, "Для каждой категории считаем сессии с просмотром её товаров",
              fontsize=12, color=MUTED)
 
     rate_axis.barh(positions, rates, color=colors, height=0.54)
@@ -106,11 +103,11 @@ def plot_categories(categories, coverage):
     rate_axis.invert_yaxis()
     rate_axis.set_xlim(0, max(baseline_percent, *rates) * 1.24)
     rate_axis.axvline(baseline_percent, color=TEXT, linestyle="--", linewidth=1.2)
-    rate_axis.set_title("Дошли до корзины, %", loc="left", fontsize=12, pad=20, color=TEXT)
+    rate_axis.set_title("Добавили в корзину, %", loc="left", fontsize=12, pad=20, color=TEXT)
     rate_axis.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:g}%"))
     count_axis.barh(positions, counts, color=colors, height=0.54)
     count_axis.set_xlim(0, max(counts) * 1.3)
-    count_axis.set_title("Сессии без перехода\nк корзине", loc="left", fontsize=12, pad=20, color=TEXT)
+    count_axis.set_title("Без добавления в корзину,\nсессии", loc="left", fontsize=12, pad=20, color=TEXT)
     count_axis.xaxis.set_major_formatter(FuncFormatter(lambda value, _: format_count(value)))
     count_axis.tick_params(labelleft=False)
 
@@ -130,16 +127,18 @@ def plot_categories(categories, coverage):
                         format_count(counts[position]),
                         va="center", fontsize=12, weight="bold", color=TEXT)
 
-    fig.text(0.035, 0.135, "Пунктир — общая доля переходов по известным категориям  " + format_percent(baseline),
+    fig.text(0.035, 0.17, "Пунктир — доля сессий с добавлением в корзину по известным категориям, " + format_percent(baseline),
              fontsize=12, color=TEXT)
-    fig.text(0.035, 0.065,
-             f"Отбор — от {format_count(MIN_VIEW_SESSIONS)} сессий с просмотром и конверсия ниже общей доли.\n"
-             "Порядок — по числу сессий без корзины.", fontsize=11, color=MUTED)
+    fig.text(0.035, 0.115,
+             f"Показаны категории с минимум {format_count(MIN_VIEW_SESSIONS)} сессий и долей ниже пунктира.",
+             fontsize=11, color=MUTED)
+    fig.text(0.035, 0.07, "Сверху — категории с большим числом сессий без добавления в корзину.",
+             fontsize=11, color=MUTED)
     fig.text(0.035, 0.025,
-             "События с неизвестной категорией — " + format_percent(coverage["unnamed_category_share"])
-             + " событий core; их доля показана отдельно в README.",
+             "У " + format_percent(coverage["unnamed_category_share"])
+             + " событий после отбора сессий отсутствует название категории.",
              fontsize=10, color=MUTED)
-    fig.savefig(OUTPUT_DIR / "named-category-conversion.png", dpi=160, facecolor="white")
+    fig.savefig(OUTPUT_DIR / "category-cart-conversion.png", dpi=160, facecolor="white")
     plt.close(fig)
 
 
