@@ -139,7 +139,7 @@ def plot_categories(categories, coverage):
              "События с неизвестной категорией — " + format_percent(coverage["unnamed_category_share"])
              + " событий core; их доля показана отдельно в README.",
              fontsize=10, color=MUTED)
-    fig.savefig(OUTPUT_DIR / "category-conversion.png", dpi=160, facecolor="white")
+    fig.savefig(OUTPUT_DIR / "named-category-conversion.png", dpi=160, facecolor="white")
     plt.close(fig)
 
 

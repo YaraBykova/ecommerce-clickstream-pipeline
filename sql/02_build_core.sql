@@ -1,5 +1,8 @@
 BEGIN;
 
+-- Полная пересборка и загрузка партий используют одну блокировку.
+SELECT pg_advisory_xact_lock(7301926);
+
 TRUNCATE TABLE
     core.events,
     core.sessions,
