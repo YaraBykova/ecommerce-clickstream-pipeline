@@ -1,5 +1,7 @@
 # Clickstream — пайплайн событий интернет-магазина
 
+[English version](https://github.com/YaraBykova/ecommerce-clickstream-pipeline-en)
+
 ## Цель проекта
 
 Получать корректную воронку «просмотр → корзина → покупка» при загрузке
